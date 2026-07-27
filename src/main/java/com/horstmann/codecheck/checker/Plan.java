@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -21,6 +22,8 @@ import java.util.Set;
 
 public class Plan {
     private Language language;
+    private String cflags;
+    private String rflags;
     private List<Runnable> tasks = new ArrayList<>();
     private Map<Path, byte[]> files = new Util.FileMap();
     private Map<Path, byte[]> outputs = new Util.FileMap();
@@ -38,7 +41,17 @@ public class Plan {
     public void setLanguage(Language language) {
         this.language = language;
     }
-    
+
+    public void setFlags(String cflags, String rflags) {
+        this.cflags = cflags;
+        this.rflags = rflags;
+    }
+
+    private static String encodeFlags(String flags) {
+        if (flags == null || flags.isBlank()) return "-";
+        return Base64.getEncoder().encodeToString(flags.getBytes(StandardCharsets.UTF_8));
+    }
+
     public void setReport(Report report) {
     	this.report = report;
     }
@@ -170,7 +183,7 @@ public class Plan {
         allSourceFiles.addAll(dependentSourceFiles);
         addScript("prepare " + compileDir + " use " + sourceDirs);
         if (!outputs.containsKey(Paths.get(compileDir).resolve("_compile")))
-            addScript("compile " + compileDir + " " + language.getLanguage() + " " + Util.join(allSourceFiles, " "));
+            addScript("compile " + compileDir + " " + language.getLanguage() + " " + encodeFlags(cflags) + " " + Util.join(allSourceFiles, " "));
     }
 
     // TODO maxOutputLen
@@ -184,7 +197,7 @@ public class Plan {
             addScript("prepare " + runDir + " " + compileDir);
         addFile(Paths.get("in").resolve(runID), input == null ? "" : input);
         if (!outputs.containsKey(Paths.get(runID).resolve("_run")))
-            addScript("run " + runDir + " " + runID + " " + Math.max(MIN_TIMEOUT, (timeout + 500) / 1000) + " " + maxOutputLen + " " + interleaveIO + " " + language.getLanguage() + " " + mainFile + (args == null ? "" : " " + args));
+            addScript("run " + runDir + " " + runID + " " + Math.max(MIN_TIMEOUT, (timeout + 500) / 1000) + " " + maxOutputLen + " " + interleaveIO + " " + encodeFlags(rflags) + " " + language.getLanguage() + " " + mainFile + (args == null ? "" : " " + args));
     }
 
     public void run(String compileDir, String runDir, Path mainFile, String args, String input, Collection<String> outfiles, int timeout, int maxOutputLen, boolean interleaveIO) {

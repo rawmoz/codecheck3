@@ -33,6 +33,8 @@ public class Main {
     
     private int timeoutMillis;
     private int maxOutputLen;
+    private String cflags;
+    private String rflags;
     private Report report;
     private Problem problem;
     // TODO: Move these into Problem instance
@@ -433,7 +435,10 @@ public class Main {
             printFiles.removeAll(problem.getSolutionFiles().keySet());
             
             timeoutMillis = (int) problem.getAnnotations().findUniqueDoubleKey("TIMEOUT", DEFAULT_TIMEOUT_MILLIS);
-            maxOutputLen = (int) problem.getAnnotations().findUniqueDoubleKey("MAXOUTPUTLEN", DEFAULT_MAX_OUTPUT_LEN);        
+            maxOutputLen = (int) problem.getAnnotations().findUniqueDoubleKey("MAXOUTPUTLEN", DEFAULT_MAX_OUTPUT_LEN);
+            cflags = problem.getAnnotations().findUnique("CFLAGS");
+            rflags = problem.getAnnotations().findUnique("RFLAGS");
+            plan.setFlags(cflags, rflags);
             double tolerance = problem.getAnnotations().findUniqueDoubleKey("TOLERANCE", DEFAULT_TOLERANCE);
             boolean ignoreCase = !"false".equalsIgnoreCase(problem.getAnnotations().findUnique("IGNORECASE"));
             boolean ignoreSpace = !"false".equalsIgnoreCase(problem.getAnnotations().findUnique("IGNORESPACE"));
@@ -446,6 +451,8 @@ public class Main {
             if (tolerance != DEFAULT_TOLERANCE) report.attribute("tolerance", tolerance);
             if (timeoutMillis != DEFAULT_TIMEOUT_MILLIS) report.attribute("timeout", timeoutMillis);
             if (maxOutputLen != DEFAULT_MAX_OUTPUT_LEN) report.attribute("maxOutputLen", maxOutputLen);
+            if (cflags != null) report.attribute("cflags", cflags);
+            if (rflags != null) report.attribute("rflags", rflags);
             if (ignoreCase == false) report.attribute("ignoreCase", ignoreCase);
             if (ignoreSpace == false) report.attribute("ignoreSpace", ignoreSpace);
             if (okToInterleave == false) report.attribute("interleave", okToInterleave);

@@ -18,9 +18,10 @@ import java.util.regex.Pattern;
 
 public class Annotations {
     public static final Set<String> VALID_ANNOTATIONS = new LinkedHashSet<>(List.of(
-            "ARGS", 
-            "CALL HIDDEN", 
-            "CALL", 
+            "ARGS",
+            "CALL HIDDEN",
+            "CALL",
+            "CFLAGS",
             "HIDDEN", 
             "HIDE", 
             "EDIT", 
@@ -38,8 +39,9 @@ public class Annotations {
             "OR", 
             "OUT", 
             "PSEUDO", 
-            "REQUIRED", 
-            "SCORING", 
+            "REQUIRED",
+            "RFLAGS",
+            "SCORING",
             "SHOW",
             "SOLUTION", 
             "TILE", 

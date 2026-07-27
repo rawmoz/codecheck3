@@ -16,32 +16,35 @@ function prepare {
   for d in $@ ; do cp -R $BASE/$d/* . 2>/dev/null ; done  
 }
 
-# args: dir language sourcefiles
+# args: dir language cflags sourcefiles
 function compile {
   DIR=$1
-  shift  
+  shift
   LANG=$1
   shift
+  CFLAGS=$1
+  shift
+  if [[ $CFLAGS == "-" ]] ; then CFLAGS="" ; else CFLAGS=$(base64 -d <<< "$CFLAGS") ; fi
   cd $BASE/$DIR
   mkdir -p $BASE/out/$DIR  
   case _"$LANG" in 
     _C)
-      gcc -std=c99 -g -o prog $@ -lm > $BASE/out/$DIR/_compile 2>&1
+      gcc -std=c99 -g $CFLAGS -o prog $@ -lm > $BASE/out/$DIR/_compile 2>&1
       ;;
     _Cpp)
-      g++ -std=c++20 -Wall -Wno-sign-compare -g -o prog $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      g++ -std=c++20 -Wall -Wno-sign-compare -g $CFLAGS -o prog $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _CSharp)
-      mcs -o Prog.exe $@  > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      mcs $CFLAGS -o Prog.exe $@  > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Dart)
-      dart --disable-analytics compile exe -o prog $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      dart --disable-analytics compile exe $CFLAGS -o prog $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Haskell)
-      ghc -o prog $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      ghc $CFLAGS -o prog $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Java)
-      javac -cp .:$BASE/use/\* $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      javac $CFLAGS -cp .:$BASE/use/\* $@ > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Bash|_JavaScript|_Matlab|_PHP)
       touch $BASE/out/$DIR/_compile
@@ -53,16 +56,16 @@ function compile {
       python3 -m py_compile $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Scala)
-      scalac $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile   
+      scalac $CFLAGS $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile   
       ;;
     _Kotlin)
-       kotlinc $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile   
+       kotlinc $CFLAGS $@ 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile   
        ;;
     _SML)
-      polyc -o prog $1 > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
+      polyc $CFLAGS -o prog $1 > $BASE/out/$DIR/_compile 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$DIR/_compile
       ;;
     _Rust)
-      rustc -g -o prog $1 > $BASE/out/$DIR/_compile 2>&1
+      rustc -g $CFLAGS -o prog $1 > $BASE/out/$DIR/_compile 2>&1
       ;;
     *)  
       echo Unknown language $LANG > $BASE/out/$DIR/_errors 
@@ -74,7 +77,7 @@ function compile {
   fi  
 }
 
-# args: dir id timeout interleaveio language module arg1 arg2 ...
+# args: dir id timeout maxoutputlen interleaveio rflags language module arg1 arg2 ...
 function run {
   DIR=$1
   shift
@@ -85,9 +88,12 @@ function run {
   MAXOUTPUTLEN=$1
   shift  
   INTERLEAVEIO=$1
-  shift  
+  shift
+  RFLAGS=$1
+  shift
+  if [[ $RFLAGS == "-" ]] ; then RFLAGS="" ; else RFLAGS=$(base64 -d <<< "$RFLAGS") ; fi
   LANG=$1
-  shift  
+  shift
   MAIN=$1
   shift
   cd $BASE/$DIR
@@ -117,11 +123,11 @@ function run {
       ulimit -d 1000000 -f 1000 -n 100 -v 10000000
       if [[ -e  ${MAIN/.java/.class} ]] ; then
         if [[ $INTERLEAVEIO == "true" ]] ; then
-          timeout -v -s 9 ${TIMEOUT}s ${CODECHECK_HOME}/interleaveio.py java -ea -Djava.awt.headless=true -Dcom.horstmann.codecheck -cp .:$BASE/use/\* ${MAIN/.java/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+          timeout -v -s 9 ${TIMEOUT}s ${CODECHECK_HOME}/interleaveio.py java $RFLAGS -ea -Djava.awt.headless=true -Dcom.horstmann.codecheck -cp .:$BASE/use/\* ${MAIN/.java/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
           cat hs_err*log >> $BASE/out/$ID/_run 2> /dev/null
           rm -f hs_err*log
         else
-          timeout -v -s 9 ${TIMEOUT}s java -ea -Djava.awt.headless=true -Dcom.horstmann.codecheck -cp .:$BASE/use/\* ${MAIN/.java/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+          timeout -v -s 9 ${TIMEOUT}s java $RFLAGS -ea -Djava.awt.headless=true -Dcom.horstmann.codecheck -cp .:$BASE/use/\* ${MAIN/.java/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
           cat hs_err*log >> $BASE/out/$ID/_run 2> /dev/null
           rm -f hs_err*log          
         fi
@@ -152,42 +158,42 @@ function run {
       # sed -i -e 's/^const //g' *CodeCheck.js # TODO Horrible hack for ancient node version--remove
       # TODO Check if still nodejs or node with Ubuntu 20.04
       ulimit -d 100000 -f 1000 -n 100 -v 1000000      
-      timeout -v -s 9 ${TIMEOUT}s node $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run    
+      timeout -v -s 9 ${TIMEOUT}s node $RFLAGS $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run    
       ;;
     _Matlab)
       ulimit -d 10000 -f 1000 -n 100 -v 1000000
-      NO_AT_BRIDGE=1 timeout -v -s 9 ${TIMEOUT}s octave --no-gui $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run    
+      NO_AT_BRIDGE=1 timeout -v -s 9 ${TIMEOUT}s octave $RFLAGS --no-gui $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run    
       ;;
      _PHP)
       ulimit -d 10000 -f 1000 -n 100 -v 1000000
-      timeout -v -s 9 ${TIMEOUT}s php $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+      timeout -v -s 9 ${TIMEOUT}s php $RFLAGS $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
       ;;     
     _Python)
       ulimit -d 100000 -f 1000 -n 100 -v 100000
       export CODECHECK=true
       if [[ -n $BASE/out/$DIR/_errors ]] ; then
         if [[ $INTERLEAVEIO == "true" ]] ; then
-           timeout -v -s 9 ${TIMEOUT}s ${CODECHECK_HOME}/interleaveio.py python3 $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+           timeout -v -s 9 ${TIMEOUT}s ${CODECHECK_HOME}/interleaveio.py python3 $RFLAGS $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
         else 
-           timeout -v -s 9 ${TIMEOUT}s python3 $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+           timeout -v -s 9 ${TIMEOUT}s python3 $RFLAGS $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
         fi
       fi
       ;;
     _Racket)
       ulimit -d 1000000 -f 1000 -n 100 -v 1000000
       if grep -qE '\(define\s+\(\s*main\s+' $MAIN ; then
-        timeout -v -s 9 ${TIMEOUT}s racket -tm $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN >> $BASE/out/$ID/_run
+        timeout -v -s 9 ${TIMEOUT}s racket $RFLAGS -tm $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN >> $BASE/out/$ID/_run
       else
-        timeout -v -s 9 ${TIMEOUT}s racket -t $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN >> $BASE/out/$ID/_run
+        timeout -v -s 9 ${TIMEOUT}s racket $RFLAGS -t $MAIN $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN >> $BASE/out/$ID/_run
       fi    
       ;;
     _Scala)
       ulimit -d 1000000 -f 1000 -n 100 -v 10000000
-      timeout -v -s 9 ${TIMEOUT}s scala ${MAIN/.scala/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+      timeout -v -s 9 ${TIMEOUT}s scala $RFLAGS ${MAIN/.scala/} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
       ;;
     _Kotlin)
       ulimit -d 1000000 -f 1000 -n 100 -v 10000000
-      timeout -v -s 9 ${TIMEOUT}s kotlin ${MAIN/.kt/Kt} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
+      timeout -v -s 9 ${TIMEOUT}s kotlin $RFLAGS ${MAIN/.kt/Kt} $@ < $BASE/in/$ID 2>&1 | head --lines $MAXOUTPUTLEN > $BASE/out/$ID/_run
       ;;
     *)  
       echo Unknown language $LANG > $BASE/out/$ID/_run 
